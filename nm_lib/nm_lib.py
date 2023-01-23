@@ -32,11 +32,12 @@ def deriv_dnw(xx, hh, **kwargs):
         The downwind 2nd order derivative of hh respect to xx. Last 
         grid point is ill (or missing) calculated. 
     """
+    
     #First order derivative in +direction with not taking boundary into account
-    #return (np.roll(hh, -1) - hh)/(np.roll(xx, -1) - xx)
+    return (np.roll(hh, -1) - hh)/(np.roll(xx, -1) - xx)
 
     #Calculate second order downwind derivative
-    #return (hh - 4 * )
+    #return (3*hh - 4*np.roll(hh, +1) + np.roll(hh, +2))/(2*(xx[1]-xx[0])
 
 
 def order_conv(hh, hh2, hh4, **kwargs):
