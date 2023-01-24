@@ -85,8 +85,7 @@ def deriv_4tho(xx, hh, **kwargs):
     """
    
 
-def step_adv_burgers(xx, hh, a, cfl_cut = 0.98, 
-                    ddx = lambda x,y: deriv_dnw(x, y), **kwargs): 
+def step_adv_burgers(xx, hh, a, cfl_cut = 0.98, **kwargs): 
     r"""
     Right hand side of Burger's eq. where a can be a constant or a function that 
     depends on xx. 
@@ -115,8 +114,15 @@ def step_adv_burgers(xx, hh, a, cfl_cut = 0.98,
     `array` 
         Time interval.
         Right hand side of (u^{n+1}-u^{n})/dt = from burgers eq, i.e., x \frac{\partial u}{\partial x} 
-    """    
+    """
+    ddx = deriv_dnw(xx, hh, kwargs)
+    dx = xx[1] - xx[0]
+    dt = 0.98 * dx / np.abs(a)
 
+    #assert cfl_adv_burger(a, xx) < cfl_cut, "cfl condition not satisfied"
+    
+    return hh - a * ddx * dt
+#cfl condition to make sure dt isnt to big.
 
 def cfl_adv_burger(a,x): 
     """
@@ -135,11 +141,14 @@ def cfl_adv_burger(a,x):
     `float`
         min(dx/|a|)
     """
+    dx = np.roll(x, -1) - x
+
+    return np.min(dx/np.abs(a))
 
 
 def evolv_adv_burgers(xx, hh, nt, a, cfl_cut = 0.98, 
-        ddx = lambda x,y: deriv_dnw(x, y), 
         bnd_type='wrap', bnd_limits=[0,1], **kwargs):
+
     r"""
     Advance nt time-steps in time the burger eq for a being a a fix constant or array.
     Requires
@@ -175,6 +184,7 @@ def evolv_adv_burgers(xx, hh, nt, a, cfl_cut = 0.98,
         Spatial and time evolution of u^n_j for n = (0,nt), and where j represents
         all the elements of the domain. 
     """
+    ddx = deriv_dnw(xx, hh, kwargs)
 
 
 def deriv_upw(xx, hh, **kwargs):
