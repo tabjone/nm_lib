@@ -115,14 +115,11 @@ def step_adv_burgers(xx, hh, a, cfl_cut = 0.98, **kwargs):
         Time interval.
         Right hand side of (u^{n+1}-u^{n})/dt = from burgers eq, i.e., x \frac{\partial u}{\partial x} 
     """
-    ddx = deriv_dnw(xx, hh, kwargs)
+    ddx = deriv_dnw(xx, hh, **kwargs)
     dx = xx[1] - xx[0]
-    dt = 0.98 * dx / np.abs(a)
+    dt = cfl_cut * dx / np.abs(a)
 
-    #assert cfl_adv_burger(a, xx) < cfl_cut, "cfl condition not satisfied"
-    
     return hh - a * ddx * dt
-#cfl condition to make sure dt isnt to big.
 
 def cfl_adv_burger(a,x): 
     """
