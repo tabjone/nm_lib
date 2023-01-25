@@ -38,13 +38,18 @@ def deriv_dnw(xx, hh, **kwargs):
     else:
         derivative_type = kwargs["derivative_type"]
     
+    dx = np.roll(xx, -1) - xx
+
     #non-centered finite difference
     if derivative_type == "finite":
-        return (np.roll(hh, -1) - hh)/(np.roll(xx, -1) - xx)
+        return (np.roll(hh, -1) - hh)/dx
+
+    if derivative_type == "higher_order":
+        return (np.roll(hh, +2) - 8 * np.roll(hh, +1) + 8 * np.roll(hh, -1) - np.roll(hh, -2)) / (12*dx)
 
     #second order downwind
     if derivative_type == "downwind":
-        return (3*hh - 4*np.roll(hh, +1) + np.roll(hh, +2))/(2*(np.roll(xx, -1) - xx))
+        return (3*hh - 4*np.roll(hh, +1) + np.roll(hh, +2))/(2*dx)
 
 
 def order_conv(hh, hh2, hh4, **kwargs):
@@ -85,7 +90,8 @@ def deriv_4tho(xx, hh, **kwargs):
     """
    
 
-def step_adv_burgers(xx, hh, a, cfl_cut = 0.98, **kwargs): 
+def step_adv_burgers(xx, hh, a,
+cfl_cut = 0.98, **kwargs): 
     r"""
     Right hand side of Burger's eq. where a can be a constant or a function that 
     depends on xx. 
@@ -181,7 +187,26 @@ def evolv_adv_burgers(xx, hh, nt, a, cfl_cut = 0.98,
         Spatial and time evolution of u^n_j for n = (0,nt), and where j represents
         all the elements of the domain. 
     """
-    ddx = deriv_dnw(xx, hh, kwargs)
+    dx = xx[1] - xx[0]
+    uu = [hh]
+    dt = cfl_cut * dx / np.abs(a)
+
+    tt = [0]
+    for i in range(nt):
+        hh = step_adv_burgers(xx, hh, a, **{"derivative_type":"finite"})
+        #Remove last point
+        hh = hh[:-1]
+        #adding first point as last point
+        hh = np.pad(hh, pad_width=(0,1) ,mode="wrap")
+        uu.append(hh)
+        tt.append(tt[-1] + dt)
+
+
+    tt = np.asarray(tt)
+    uu = np.asarray(uu)
+    return tt, uu
+
+
 
 
 def deriv_upw(xx, hh, **kwargs):
@@ -260,6 +285,10 @@ def evolv_uadv_burgers(xx, hh, nt, cfl_cut = 0.98,
         all the elements of the domain. 
     """
 
+    #step_adv_burgers -> rhs
+    #fix boundaries from the rhs
+    #compute ut+1
+    
 
 def evolv_Lax_uadv_burgers(xx, hh, nt, cfl_cut = 0.98, 
         ddx = lambda x,y: deriv_dnw(x, y), 
