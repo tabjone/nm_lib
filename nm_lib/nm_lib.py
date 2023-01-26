@@ -15,6 +15,28 @@ import numpy as np
 import matplotlib.pyplot as plt 
 
 
+def deriv_finite(xx, hh, **kwargs):
+    """
+    Returns the non-centered 1st order derivative of hh respect to xx. 
+
+    Parameters 
+    ----------
+    xx : `array`
+        Spatial axis. 
+    hh : `array`
+        Function that depends on xx. 
+
+    Returns
+    -------
+    `array`
+        The non-centered 2nd order derivative of hh respect to xx. 
+        Last point is ill calculated. 
+    """
+    dx = np.roll(xx, -1) - xx
+
+    return (np.roll(hh, -1) - hh)/dx
+
+
 def deriv_dnw(xx, hh, **kwargs):
     """
     Returns the downwind 2nd order derivative of hh array respect to xx array. 
@@ -32,24 +54,9 @@ def deriv_dnw(xx, hh, **kwargs):
         The downwind 2nd order derivative of hh respect to xx. Last 
         grid point is ill (or missing) calculated. 
     """
-    #Checking kwargs for derivative type
-    if "derivative_type" not in kwargs:
-        derivative_type = "downwind"
-    else:
-        derivative_type = kwargs["derivative_type"]
-    
     dx = np.roll(xx, -1) - xx
 
-    #non-centered finite difference
-    if derivative_type == "finite":
-        return (np.roll(hh, -1) - hh)/dx
-
-    if derivative_type == "higher_order":
-        return (np.roll(hh, +2) - 8 * np.roll(hh, +1) + 8 * np.roll(hh, -1) - np.roll(hh, -2)) / (12*dx)
-
-    #second order downwind
-    if derivative_type == "downwind":
-        return (3*hh - 4*np.roll(hh, +1) + np.roll(hh, +2))/(2*dx)
+    return (3*hh - 4*np.roll(hh, +1) + np.roll(hh, +2))/(2*dx)
 
 
 def order_conv(hh, hh2, hh4, **kwargs):
@@ -88,10 +95,12 @@ def deriv_4tho(xx, hh, **kwargs):
         The centered 4th order derivative of hh respect to xx. 
         Last and first two grid points are ill calculated. 
     """
-   
+    dx = np.roll(xx, -1) - xx
 
-def step_adv_burgers(xx, hh, a,
-cfl_cut = 0.98, **kwargs): 
+    return (np.roll(hh, +2) - 8 * np.roll(hh, +1) + 8 * np.roll(hh, -1) - np.roll(hh, -2)) / (12*dx)   
+
+def step_adv_burgers(xx, hh, a, cfl_cut = 0.98, 
+                    ddx = lambda x,y: deriv_dnw(x, y), **kwargs): 
     r"""
     Right hand side of Burger's eq. where a can be a constant or a function that 
     depends on xx. 
@@ -121,11 +130,9 @@ cfl_cut = 0.98, **kwargs):
         Time interval.
         Right hand side of (u^{n+1}-u^{n})/dt = from burgers eq, i.e., x \frac{\partial u}{\partial x} 
     """
-    ddx = deriv_dnw(xx, hh, **kwargs)
-    dx = xx[1] - xx[0]
-    dt = cfl_cut * dx / np.abs(a)
+    dt = cfl_cut * cfl_adv_burger(a, xx)
 
-    return hh - a * ddx * dt
+    return dt, - a * ddx(xx, hh)
 
 def cfl_adv_burger(a,x): 
     """
@@ -144,14 +151,13 @@ def cfl_adv_burger(a,x):
     `float`
         min(dx/|a|)
     """
-    dx = np.roll(x, -1) - x
 
-    return np.min(dx/np.abs(a))
+    return np.min(np.gradient(x)/np.abs(a))
 
 
 def evolv_adv_burgers(xx, hh, nt, a, cfl_cut = 0.98, 
+        ddx = lambda x,y: deriv_dnw(x, y), 
         bnd_type='wrap', bnd_limits=[0,1], **kwargs):
-
     r"""
     Advance nt time-steps in time the burger eq for a being a a fix constant or array.
     Requires
@@ -187,24 +193,26 @@ def evolv_adv_burgers(xx, hh, nt, a, cfl_cut = 0.98,
         Spatial and time evolution of u^n_j for n = (0,nt), and where j represents
         all the elements of the domain. 
     """
-    dx = xx[1] - xx[0]
-    uu = [hh]
-    dt = cfl_cut * dx / np.abs(a)
+    dt = cfl_cut * cfl_adv_burger(a, xx)
 
-    tt = [0]
-    for i in range(nt):
-        hh = step_adv_burgers(xx, hh, a, **{"derivative_type":"finite"})
-        #Remove last point
-        hh = hh[:-1]
-        #adding first point as last point
-        hh = np.pad(hh, pad_width=(0,1) ,mode="wrap")
-        uu.append(hh)
-        tt.append(tt[-1] + dt)
+    tt = np.zeros(nt)
+    un = np.zeros((nt, len(xx)))
 
+    un[0,:] = hh
+    tt[0] = 0
 
-    tt = np.asarray(tt)
-    uu = np.asarray(uu)
-    return tt, uu
+    for i in range(0,nt-1):
+        dt, rhs = step_adv_burgers(xx, un[i,:], a, ddx=ddx, cfl_cut=cfl_cut)
+        hh = un[i,:] + rhs * dt
+   
+        #remove ill calculated points
+        hh = hh[bnd_limits[0]:-bnd_limits[1]]
+        #padding
+        hh = np.pad(hh, pad_width=bnd_limits ,mode=bnd_type)
+        un[i+1,:] = hh
+        tt[i+1] = tt[i] + dt
+
+    return tt, un
 
 
 
@@ -226,6 +234,8 @@ def deriv_upw(xx, hh, **kwargs):
         The upwind 2nd order derivative of hh respect to xx. First 
         grid point is ill calculated. 
     """
+    dx = np.roll(xx, -1) - xx
+    return (-np.roll(hh, -2) + 4 * np.roll(hh, -1) - hh)/dx
     
 
 def deriv_cent(xx, hh, **kwargs):
@@ -245,6 +255,7 @@ def deriv_cent(xx, hh, **kwargs):
         The centered 2nd order derivative of hh respect to xx. First 
         and last grid points are ill calculated. 
     """
+    assert False, "Not implemented yet."
 
 
 def evolv_uadv_burgers(xx, hh, nt, cfl_cut = 0.98, 
