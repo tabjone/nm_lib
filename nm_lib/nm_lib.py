@@ -14,7 +14,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt 
 
-def deriv_frwrd_finite(xx, hh, **kwargs):
+def deriv_dnw(xx, hh, **kwargs):
     """
     Returns the non-centered 1st order forward derivative of hh respect to xx. 
 
@@ -31,16 +31,56 @@ def deriv_frwrd_finite(xx, hh, **kwargs):
         The non-centered 1st order forward derivative of hh respect to xx. 
         Last point is ill calculated. 
     """
+    if "ddx_order" in kwargs:
+        order = kwargs["ddx_order"]
+    else:
+        order = 2
+
     dx = np.roll(xx, -1) - xx
+    if order == 1:
+        return (np.roll(hh, -1) - hh)/dx
+    if order == 2:
+        return (-np.roll(hh, -2) + 4 * np.roll(hh, -1) - hh)/dx
+    else:
+        raise ValueError('Order not implemented')
 
-    return (np.roll(hh, -1) - hh)/dx
 
-def deriv_bckwrd_finite(xx, hh, **kwargs):
-    """
-    Returns the non-centered 1st order backward derivative of hh respect to xx. 
+def deriv_upw(xx, hh, **kwargs):
+    r"""
+    returns the upwind 2nd order derivative of hh respect to xx. 
 
-    Parameters 
+    Parameters
     ----------
+    xx : `array`
+        Spatial axis. 
+    hh : `array`
+        Function that depends on xx. 
+
+    Returns
+    ------- 
+    `array`
+        The upwind 2nd order derivative of hh respect to xx. First 
+        grid point is ill calculated. 
+    """
+    if "ddx_order" in kwargs:
+        order = kwargs["ddx_order"]
+    else:
+        order = 2
+
+    dx = xx - np.roll(xx, +1)
+
+    if order == 1:
+        return (hh - np.roll(hh, +1))/dx
+    if order == 2:
+        return (3*hh - 4*np.roll(hh,+1) + np.roll(hh, +2))/(2*dx)
+        
+    
+def deriv_cent(xx, hh, **kwargs):
+    r"""
+    returns the centered 2nd derivative of hh respect to xx. 
+
+    Parameters
+    ---------- 
     xx : `array`
         Spatial axis. 
     hh : `array`
@@ -49,33 +89,25 @@ def deriv_bckwrd_finite(xx, hh, **kwargs):
     Returns
     -------
     `array`
-        The non-centered 1st order backward derivative of hh respect to xx. 
-        First point is ill calculated. 
+        The centered 2nd order derivative of hh respect to xx. First 
+        and last grid points are ill calculated. 
     """
+    if "ddx_order" in kwargs:
+        order = kwargs["ddx_order"]
+    else:
+        order = 1
+
     dx = np.roll(xx, -1) - xx
 
-    return (hh - np.roll(hh, +1))/dx
+    if order == 1:
+        return (np.roll(hh, -1) - np.roll(hh, 1))/(2*dx)
 
-def deriv_dnw(xx, hh, **kwargs):
-    """
-    Returns the downwind 2nd order derivative of hh array respect to xx array. 
+    if order == 4:
+        return (np.roll(hh, +2) - 8 * np.roll(hh, +1) + 8 * np.roll(hh, -1) - np.roll(hh, -2)) / (12*dx)
+    else:
+        raise ValueError('Order not implemented')
 
-    Parameters 
-    ----------
-    xx : `array`
-        Spatial axis. 
-    hh : `array`
-        Function that depends on xx. 
 
-    Returns
-    -------
-    `array`
-        The downwind 2nd order derivative of hh respect to xx. Last 
-        grid point is ill (or missing) calculated. 
-    """
-    dx = np.roll(xx, -1) - xx
-
-    return (3*hh - 4*np.roll(hh, +1) + np.roll(hh, +2))/(2*dx)
 
 
 def order_conv(hh, hh2, hh4, **kwargs):
@@ -96,28 +128,6 @@ def order_conv(hh, hh2, hh4, **kwargs):
         The order of convergence.  
     """
    
-
-def deriv_4tho(xx, hh, **kwargs): 
-    """
-    Returns the 4th order derivative of hh respect to xx.
-
-    Parameters 
-    ---------- 
-    xx : `array`
-        Spatial axis. 
-    hh : `array`
-        Function that depends on xx. 
-
-    Returns
-    -------
-    `array`
-        The centered 4th order derivative of hh respect to xx. 
-        Last and first two grid points are ill calculated. 
-    """
-    dx = np.roll(xx, -1) - xx
-
-    return (np.roll(hh, +2) - 8 * np.roll(hh, +1) + 8 * np.roll(hh, -1) - np.roll(hh, -2)) / (12*dx)   
-
 def step_adv_burgers(xx, hh, a, cfl_cut = 0.98, 
                     ddx = lambda x,y: deriv_dnw(x, y), **kwargs): 
     r"""
@@ -225,61 +235,16 @@ def evolv_adv_burgers(xx, hh, nt, a, cfl_cut = 0.98,
         hh = un[i,:] + rhs * dt
    
         #remove ill calculated points
-        hh = hh[bnd_limits[0]:-bnd_limits[1]]
-        print("hello")
+        if bnd_limits[1] != 0:
+            hh = hh[bnd_limits[0]:-bnd_limits[1]]
+        else:
+            hh = hh[bnd_limits[0]:]
         #padding
         hh = np.pad(hh, pad_width=bnd_limits ,mode=bnd_type)
-        print("hello")
         un[i+1,:] = hh
         tt[i+1] = tt[i] + dt
 
     return tt, un
-
-
-
-
-def deriv_upw(xx, hh, **kwargs):
-    r"""
-    returns the upwind 2nd order derivative of hh respect to xx. 
-
-    Parameters
-    ----------
-    xx : `array`
-        Spatial axis. 
-    hh : `array`
-        Function that depends on xx. 
-
-    Returns
-    ------- 
-    `array`
-        The upwind 2nd order derivative of hh respect to xx. First 
-        grid point is ill calculated. 
-    """
-    dx = np.roll(xx, -1) - xx
-    return (-np.roll(hh, -2) + 4 * np.roll(hh, -1) - hh)/dx
-    
-
-def deriv_cent(xx, hh, **kwargs):
-    r"""
-    returns the centered 2nd derivative of hh respect to xx. 
-
-    Parameters
-    ---------- 
-    xx : `array`
-        Spatial axis. 
-    hh : `array`
-        Function that depends on xx. 
-
-    Returns
-    -------
-    `array`
-        The centered 2nd order derivative of hh respect to xx. First 
-        and last grid points are ill calculated. 
-    """
-    dx = np.roll(xx, -1) - xx
-    
-    return (np.roll(hh, -1) - np.roll(hh, 1))/(2*dx)
-
 
 def evolv_uadv_burgers(xx, hh, nt, cfl_cut = 0.98, 
         ddx = lambda x,y: deriv_dnw(x, y), 
@@ -318,10 +283,6 @@ def evolv_uadv_burgers(xx, hh, nt, cfl_cut = 0.98,
         Spatial and time evolution of u^n_j for n = (0,nt), and where j represents
         all the elements of the domain. 
     """
-
-    #step_adv_burgers -> rhs
-    #fix boundaries from the rhs
-    #compute ut+1
     
 
 def evolv_Lax_uadv_burgers(xx, hh, nt, cfl_cut = 0.98, 
