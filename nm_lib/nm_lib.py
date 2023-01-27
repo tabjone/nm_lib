@@ -41,7 +41,7 @@ def deriv_dnw(xx, hh, **kwargs):
     if order == 1:
         return (np.roll(hh, -1) - hh)/dx
     
-    if order == 2:
+    elif order == 2:
         return (-np.roll(hh, -2) + 4 * np.roll(hh, -1) - hh)/dx
     
     else:
@@ -74,8 +74,10 @@ def deriv_upw(xx, hh, **kwargs):
 
     if order == 1:
         return (hh - np.roll(hh, +1))/dx
-    if order == 2:
+    elif order == 2:
         return (3*hh - 4*np.roll(hh,+1) + np.roll(hh, +2))/(2*dx)
+    else:
+        raise ValueError('Order not implemented')
         
     
 def deriv_cent(xx, hh, **kwargs):
@@ -105,12 +107,10 @@ def deriv_cent(xx, hh, **kwargs):
     if order == 2:
         return (np.roll(hh, -1) - np.roll(hh, 1))/(2*dx)
 
-    if order == 4:
+    elif order == 4:
         return (np.roll(hh, +2) - 8 * np.roll(hh, +1) + 8 * np.roll(hh, -1) - np.roll(hh, -2)) / (12*dx)
     else:
         raise ValueError('Order not implemented')
-
-
 
 
 def order_conv(hh, hh2, hh4, **kwargs):
@@ -183,7 +183,6 @@ def cfl_adv_burger(a,x):
     `float`
         min(dx/|a|)
     """
-
     return np.min(np.gradient(x)/np.abs(a))
 
 
@@ -228,14 +227,17 @@ def evolv_adv_burgers(xx, hh, nt, a, cfl_cut = 0.98,
     dt = cfl_cut * cfl_adv_burger(a, xx)
 
     tt = np.zeros(nt)
-    un = np.zeros((nt, len(xx)))
+    unnt = np.zeros((nt, len(xx)))
 
-    un[0,:] = hh
+    #setting initial values
+    unnt[0,:] = hh
     tt[0] = 0
 
     for i in range(0,nt-1):
-        dt, rhs = step_adv_burgers(xx, un[i,:], a, ddx=ddx, cfl_cut=cfl_cut, **kwargs)
-        hh = un[i,:] + rhs * dt
+        #getting timestep and rhs of Burgers eq
+        dt, rhs = step_adv_burgers(xx, unnt[i,:], a, ddx=ddx, cfl_cut=cfl_cut, **kwargs)
+        #forwarding in time
+        hh = unnt[i,:] + rhs * dt
    
         #remove ill calculated points
         if bnd_limits[1] != 0:
@@ -244,10 +246,10 @@ def evolv_adv_burgers(xx, hh, nt, a, cfl_cut = 0.98,
             hh = hh[bnd_limits[0]:]
         #padding
         hh = np.pad(hh, pad_width=bnd_limits ,mode=bnd_type)
-        un[i+1,:] = hh
+        unnt[i+1,:] = hh
         tt[i+1] = tt[i] + dt
 
-    return tt, un
+    return tt, unnt
 
 def evolv_uadv_burgers(xx, hh, nt, cfl_cut = 0.98, 
         ddx = lambda x,y: deriv_dnw(x, y), 
