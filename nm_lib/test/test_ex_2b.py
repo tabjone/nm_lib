@@ -30,7 +30,7 @@ def test_ex_2b():
     a = db(-1)
 
     #calculating numerical solution
-    tt, ut = nm.evolv_adv_burgers(xx, hh, nt, a, ddx=nm.deriv_finite)
+    tt, ut = nm.evolv_adv_burgers(xx, hh, nt, a, ddx=nm.deriv_dnw, **{"ddx_order":1})
     #calulating numerical solution
     X = np.zeros((len(tt), len(xx)))
     uu_analytic = np.zeros((len(tt),len(xx)))
