@@ -37,10 +37,13 @@ def deriv_dnw(xx, hh, **kwargs):
         order = 2
 
     dx = np.roll(xx, -1) - xx
+    
     if order == 1:
         return (np.roll(hh, -1) - hh)/dx
+    
     if order == 2:
         return (-np.roll(hh, -2) + 4 * np.roll(hh, -1) - hh)/dx
+    
     else:
         raise ValueError('Order not implemented')
 
@@ -95,11 +98,11 @@ def deriv_cent(xx, hh, **kwargs):
     if "ddx_order" in kwargs:
         order = kwargs["ddx_order"]
     else:
-        order = 1
+        order = 2
 
     dx = np.roll(xx, -1) - xx
 
-    if order == 1:
+    if order == 2:
         return (np.roll(hh, -1) - np.roll(hh, 1))/(2*dx)
 
     if order == 4:
@@ -161,7 +164,7 @@ def step_adv_burgers(xx, hh, a, cfl_cut = 0.98,
     """
     dt = cfl_cut * cfl_adv_burger(a, xx)
 
-    return dt, - a * ddx(xx, hh)
+    return dt, - a * ddx(xx, hh, **kwargs)
 
 def cfl_adv_burger(a,x): 
     """
@@ -231,7 +234,7 @@ def evolv_adv_burgers(xx, hh, nt, a, cfl_cut = 0.98,
     tt[0] = 0
 
     for i in range(0,nt-1):
-        dt, rhs = step_adv_burgers(xx, un[i,:], a, ddx=ddx, cfl_cut=cfl_cut)
+        dt, rhs = step_adv_burgers(xx, un[i,:], a, ddx=ddx, cfl_cut=cfl_cut, **kwargs)
         hh = un[i,:] + rhs * dt
    
         #remove ill calculated points
