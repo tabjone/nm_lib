@@ -14,10 +14,9 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt 
 
-
-def deriv_finite(xx, hh, **kwargs):
+def deriv_frwrd_finite(xx, hh, **kwargs):
     """
-    Returns the non-centered 1st order derivative of hh respect to xx. 
+    Returns the non-centered 1st order forward derivative of hh respect to xx. 
 
     Parameters 
     ----------
@@ -29,13 +28,33 @@ def deriv_finite(xx, hh, **kwargs):
     Returns
     -------
     `array`
-        The non-centered 2nd order derivative of hh respect to xx. 
+        The non-centered 1st order forward derivative of hh respect to xx. 
         Last point is ill calculated. 
     """
     dx = np.roll(xx, -1) - xx
 
     return (np.roll(hh, -1) - hh)/dx
 
+def deriv_bckwrd_finite(xx, hh, **kwargs):
+    """
+    Returns the non-centered 1st order backward derivative of hh respect to xx. 
+
+    Parameters 
+    ----------
+    xx : `array`
+        Spatial axis. 
+    hh : `array`
+        Function that depends on xx. 
+
+    Returns
+    -------
+    `array`
+        The non-centered 1st order backward derivative of hh respect to xx. 
+        First point is ill calculated. 
+    """
+    dx = np.roll(xx, -1) - xx
+
+    return (hh - np.roll(hh, +1))/dx
 
 def deriv_dnw(xx, hh, **kwargs):
     """
@@ -207,8 +226,10 @@ def evolv_adv_burgers(xx, hh, nt, a, cfl_cut = 0.98,
    
         #remove ill calculated points
         hh = hh[bnd_limits[0]:-bnd_limits[1]]
+        print("hello")
         #padding
         hh = np.pad(hh, pad_width=bnd_limits ,mode=bnd_type)
+        print("hello")
         un[i+1,:] = hh
         tt[i+1] = tt[i] + dt
 
@@ -255,7 +276,9 @@ def deriv_cent(xx, hh, **kwargs):
         The centered 2nd order derivative of hh respect to xx. First 
         and last grid points are ill calculated. 
     """
-    assert False, "Not implemented yet."
+    dx = np.roll(xx, -1) - xx
+    
+    return (np.roll(hh, -1) - np.roll(hh, 1))/(2*dx)
 
 
 def evolv_uadv_burgers(xx, hh, nt, cfl_cut = 0.98, 
