@@ -289,6 +289,39 @@ def evolv_uadv_burgers(xx, hh, nt, cfl_cut = 0.98,
         all the elements of the domain. 
     """
     
+def step_uadv_burgers(xx, hh, cfl_cut = 0.98, 
+                    ddx = lambda x,y: deriv_dnw(x, y), **kwargs): 
+    r"""
+    Right hand side of Burger's eq. where a is u, i.e hh.  
+
+    Requires
+    --------
+        cfl_adv_burger function which computes np.min(dx/a)
+
+    Parameters
+    ----------   
+    xx : `array`
+        Spatial axis. 
+    hh : `array`
+        Function that depends on xx.
+    cfl_cut : `array`
+        Constant value to limit dt from cfl_adv_burger. 
+        By default 0.98
+    ddx : `lambda function` 
+        Allows to select the type of spatial derivative.
+        By default lambda x,y: deriv_dnw(x, y)
+
+
+    Returns
+    -------
+    dt : `array`
+        time interval
+    unnt : `array`
+        right hand side of (u^{n+1}-u^{n})/dt = from burgers eq, i.e., x \frac{\partial u}{\partial x} 
+    """   
+    dt = cfl_cut * cfl_adv_burger(a, xx)
+
+    return dt, - 0.5 * hh * ddx(xx, hh, **kwargs)    
 
 def evolv_Lax_uadv_burgers(xx, hh, nt, cfl_cut = 0.98, 
         ddx = lambda x,y: deriv_dnw(x, y), 
@@ -327,6 +360,30 @@ def evolv_Lax_uadv_burgers(xx, hh, nt, cfl_cut = 0.98,
         Spatial and time evolution of u^n_j for n = (0,nt), and where j represents
         all the elements of the domain. 
     """
+
+    tt = np.zeros(nt)
+    unnt = np.zeros((nt, len(xx)))
+
+    #setting initial values
+    unnt[0,:] = hh
+    tt[0] = 0
+
+    for i in range(0,nt-1):
+        #getting timestep and rhs of Burgers eq
+        dt, rhs = step_uadv_burgers(xx, unnt[i,:], ddx=ddx, cfl_cut=cfl_cut, **kwargs)
+        #forwarding in time
+        hh = 0.5 * (np.roll(hh, -1) + np.roll(hh, +1)) + rhs * dt
+   
+        #remove ill calculated points
+        if bnd_limits[1] != 0:
+            hh = hh[bnd_limits[0]:-bnd_limits[1]]
+        else:
+            hh = hh[bnd_limits[0]:]
+        #padding
+        hh = np.pad(hh, pad_width=bnd_limits ,mode=bnd_type)
+        unnt[i+1,:] = hh
+        tt[i+1] = tt[i] + dt
+    return tt, unnt
 
 
 def evolv_Lax_adv_burgers(xx, hh, nt, a, cfl_cut = 0.98, 
@@ -373,37 +430,6 @@ def evolv_Lax_adv_burgers(xx, hh, nt, a, cfl_cut = 0.98,
     """
 
 
-def step_uadv_burgers(xx, hh, cfl_cut = 0.98, 
-                    ddx = lambda x,y: deriv_dnw(x, y), **kwargs): 
-    r"""
-    Right hand side of Burger's eq. where a is u, i.e hh.  
-
-    Requires
-    --------
-        cfl_adv_burger function which computes np.min(dx/a)
-
-    Parameters
-    ----------   
-    xx : `array`
-        Spatial axis. 
-    hh : `array`
-        Function that depends on xx.
-    cfl_cut : `array`
-        Constant value to limit dt from cfl_adv_burger. 
-        By default 0.98
-    ddx : `lambda function` 
-        Allows to select the type of spatial derivative.
-        By default lambda x,y: deriv_dnw(x, y)
-
-
-    Returns
-    -------
-    dt : `array`
-        time interval
-    unnt : `array`
-        right hand side of (u^{n+1}-u^{n})/dt = from burgers eq, i.e., x \frac{\partial u}{\partial x} 
-    """       
-
 
 def cfl_diff_burger(a,x): 
     r"""
@@ -422,6 +448,15 @@ def cfl_diff_burger(a,x):
     `float`
         min(dx/|a|)
     """
+
+def evolv_Rie_uadv_burgers(xx, hh, ):
+
+
+    #jacobian of flux vector
+    #r_RL = largest characteristic value of |A_RL|
+
+    f = r_RL * u + b_RL
+
 
 
 def ops_Lax_LL_Add(xx, hh, nt, a, b, cfl_cut = 0.98, 
