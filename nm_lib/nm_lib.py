@@ -289,9 +289,32 @@ def evolv_uadv_burgers(xx, hh, nt, cfl_cut = 0.98,
         all the elements of the domain. 
     """
 
-    #WRITE IN THIS FOR COMPARRISON PART OF ex_4a!
+    tt = np.zeros(nt)
+    unnt = np.zeros((nt, len(xx)))
+
+    #setting initial values
+    unnt[0,:] = hh
+    tt[0] = 0
+
+    for i in range(0,nt-1):
+        #getting timestep and rhs of Burgers eq
+        dt, rhs = step_uadv_burgers(xx, unnt[i,:], ddx=ddx, cfl_cut=cfl_cut, **kwargs)
+        #forwarding in time
+        hh = unnt[i,:] + rhs * dt
+   
+        #remove ill calculated points
+        if bnd_limits[1] != 0:
+            hh = hh[bnd_limits[0]:-bnd_limits[1]]
+        else:
+            hh = hh[bnd_limits[0]:]
+        #padding
+        hh = np.pad(hh, pad_width=bnd_limits ,mode=bnd_type)
+        unnt[i+1,:] = hh
+        tt[i+1] = tt[i] + dt
+
+    return tt, unnt
     
-def step_uadv_burgers(xx, hh, a, cfl_cut = 0.98, 
+def step_uadv_burgers(xx, hh, cfl_cut = 0.98, 
                     ddx = lambda x,y: deriv_dnw(x, y), **kwargs): 
     r"""
     Right hand side of Burger's eq. where a is u, i.e hh.  
@@ -321,7 +344,7 @@ def step_uadv_burgers(xx, hh, a, cfl_cut = 0.98,
     unnt : `array`
         right hand side of (u^{n+1}-u^{n})/dt = from burgers eq, i.e., x \frac{\partial u}{\partial x} 
     """   
-    dt = cfl_cut * cfl_adv_burger(a, xx)
+    dt = cfl_cut * cfl_adv_burger(hh, xx)
 
     return dt, - hh * ddx(xx, hh, **kwargs)    
 
@@ -372,7 +395,7 @@ def evolv_Lax_uadv_burgers(xx, hh, nt, cfl_cut = 0.98,
 
     for i in range(0,nt-1):
         #getting timestep and rhs of Burgers eq
-        dt, rhs = step_uadv_burgers(xx, unnt[i,:], unnt[i,:], ddx=ddx, cfl_cut=cfl_cut, **kwargs)
+        dt, rhs = step_uadv_burgers(xx, unnt[i,:], ddx=ddx, cfl_cut=cfl_cut, **kwargs)
         #forwarding in time
         hh = 0.5 * (np.roll(hh, -1) + np.roll(hh, +1)) + rhs * dt
    
@@ -457,9 +480,9 @@ def cfl_diff_burger(a,x):
     #jacobian of flux vector
     #r_RL = largest characteristic value of |A_RL|
 
-#    f(u) = a(u_RL) * (u - u_R) 
+    #f(u) = a(u_RL) * (u - u_R) 
 
-#    f = r_RL * u + b_RL
+    #f = r_RL * u + b_RL
 
 
 
