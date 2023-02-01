@@ -288,8 +288,10 @@ def evolv_uadv_burgers(xx, hh, nt, cfl_cut = 0.98,
         Spatial and time evolution of u^n_j for n = (0,nt), and where j represents
         all the elements of the domain. 
     """
+
+    #WRITE IN THIS FOR COMPARRISON PART OF ex_4a!
     
-def step_uadv_burgers(xx, hh, cfl_cut = 0.98, 
+def step_uadv_burgers(xx, hh, a, cfl_cut = 0.98, 
                     ddx = lambda x,y: deriv_dnw(x, y), **kwargs): 
     r"""
     Right hand side of Burger's eq. where a is u, i.e hh.  
@@ -321,7 +323,7 @@ def step_uadv_burgers(xx, hh, cfl_cut = 0.98,
     """   
     dt = cfl_cut * cfl_adv_burger(a, xx)
 
-    return dt, - 0.5 * hh * ddx(xx, hh, **kwargs)    
+    return dt, - hh * ddx(xx, hh, **kwargs)    
 
 def evolv_Lax_uadv_burgers(xx, hh, nt, cfl_cut = 0.98, 
         ddx = lambda x,y: deriv_dnw(x, y), 
@@ -370,7 +372,7 @@ def evolv_Lax_uadv_burgers(xx, hh, nt, cfl_cut = 0.98,
 
     for i in range(0,nt-1):
         #getting timestep and rhs of Burgers eq
-        dt, rhs = step_uadv_burgers(xx, unnt[i,:], ddx=ddx, cfl_cut=cfl_cut, **kwargs)
+        dt, rhs = step_uadv_burgers(xx, unnt[i,:], unnt[i,:], ddx=ddx, cfl_cut=cfl_cut, **kwargs)
         #forwarding in time
         hh = 0.5 * (np.roll(hh, -1) + np.roll(hh, +1)) + rhs * dt
    
@@ -449,13 +451,15 @@ def cfl_diff_burger(a,x):
         min(dx/|a|)
     """
 
-def evolv_Rie_uadv_burgers(xx, hh, ):
+#def evolv_Rie_uadv_burgers(xx, u_L, u_R):
 
 
     #jacobian of flux vector
     #r_RL = largest characteristic value of |A_RL|
 
-    f = r_RL * u + b_RL
+#    f(u) = a(u_RL) * (u - u_R) 
+
+#    f = r_RL * u + b_RL
 
 
 
