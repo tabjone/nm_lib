@@ -349,8 +349,8 @@ def step_uadv_burgers(xx, hh, cfl_cut = 0.98,
     return dt, - hh * ddx(xx, hh, **kwargs)    
 
 def evolv_Lax_uadv_burgers(xx, hh, nt, cfl_cut = 0.98, 
-        ddx = lambda x,y: deriv_dnw(x, y), 
-        bnd_type='wrap', bnd_limits=[0,1], **kwargs):
+        ddx = lambda x,y: deriv_cent(x, y), 
+        bnd_type='wrap', bnd_limits=[1,1], **kwargs):
     r"""
     Advance nt time-steps in time the burger eq for a being u using the Lax method.
 
@@ -474,15 +474,102 @@ def cfl_diff_burger(a,x):
         min(dx/|a|)
     """
 
-#def evolv_Rie_uadv_burgers(xx, u_L, u_R):
+def tangent(xx, hh, i):
+    """
+    Computes the tangent of the function hh at the point xx[i]
+
+    Parameters
+    ----------
+    xx : `array`
+        Spatial axis.
+    hh : `array`
+        Function that depends on xx.
+    i : `int`
+        Index of the point where the tangent is computed.
+
+    Returns
+    -------
+    `array`
+        Tangent of the function hh at the point xx[i]
+    """
+    return hh[i] + np.gradient(hh)[i]/np.gradient(xx)[i] * (xx - xx[i])
 
 
-    #jacobian of flux vector
-    #r_RL = largest characteristic value of |A_RL|
+def step_Rie_uadv_burgers(xx, hh, clf_cut = 0.98,
+                    ddx = lambda x,y: deriv_dnw(x, y), **kwargs):
+    r"""
+    Computes the timestep and the right hand side of the Burger's eq
+    for the Riemann problem. 
 
-    #f(u) = a(u_RL) * (u - u_R) 
+    Parameters
+    ----------
+    xx : `array`
+        Spatial axis. 
+    hh : `array`
+        Function that depends on xx.
+    clf_cut : `float`
+        Constant value to limit dt from cfl_adv_burger. 
+        By default 0.98
 
-    #f = r_RL * u + b_RL
+    Returns
+    -------
+    dt : `float`
+        Timestep
+    rhs : `array`
+        Right hand side of the Burger's eq
+    """
+
+    #find tangent of uL
+    tangent_uL = tangent(xx, hh, 0)
+    #find tangent of uR
+    tangent_uR = tangent(xx, hh, -1)
+
+    a_uRL = (tangent_uR - tangent_uL)/(hh[-1] - hh[0])
+
+    lin_approx = a_uRL * (hh - hh[-1]) + tangent_uR 
+
+    #compute dt
+    dt = cfl_adv_burger(xx, hh)
+
+    rhs = -hh * ddx(xx, lin_approx, **kwargs)
+
+    return dt, rhs
+
+
+def evolv_Rie_uadv_burgers(xx, hh, nt, cfl_cut = 0.98,
+        ddx = lambda x,y: deriv_dnw(x, y),
+        bnd_type='wrap', bnd_limits=[0,1], **kwargs):
+    r"""
+    """
+
+    tt = np.zeros(nt)
+    unnt = np.zeros((nt, len(xx)))
+
+    #setting initial values
+    unnt[0,:] = hh
+    tt[0] = 0
+
+    #dt = cfl_cut * cfl_adv_burger(hh, xx)
+
+    for i in range(0,nt-1):
+        #getting timestep and rhs of Burgers eq
+        dt, rhs = step_Rie_uadv_burgers(xx, unnt[i,:], ddx=ddx, cfl_cut=cfl_cut, **kwargs)
+        #forwarding in time
+        hh = unnt[i,:] + rhs * dt
+   
+        #remove ill calculated points
+        if bnd_limits[1] != 0:
+            hh = hh[bnd_limits[0]:-bnd_limits[1]]
+        else:
+            hh = hh[bnd_limits[0]:]
+        #padding
+        hh = np.pad(hh, pad_width=bnd_limits ,mode=bnd_type)
+        unnt[i+1,:] = hh
+        tt[i+1] = tt[i] + dt
+
+    return tt, unnt
+
+
 
 
 
