@@ -527,7 +527,7 @@ def step_Rie_uadv_burgers(xx, hh, clf_cut = 0.98,
     a_uRL = (tangent_uR - tangent_uL)/(hh[-1] - hh[0])
 
     lin_approx = a_uRL * (hh - hh[-1]) + tangent_uR 
-
+    
     #compute dt
     dt = cfl_adv_burger(xx, hh)
 
