@@ -34,7 +34,7 @@ def deriv_dnw(xx, hh, **kwargs):
     if "ddx_order" in kwargs:
         order = kwargs["ddx_order"]
     else:
-        order = 2
+        order = 1
 
     dx = np.roll(xx, -1) - xx
     
@@ -68,7 +68,7 @@ def deriv_upw(xx, hh, **kwargs):
     if "ddx_order" in kwargs:
         order = kwargs["ddx_order"]
     else:
-        order = 2
+        order = 1
 
     dx = xx - np.roll(xx, +1)
 
@@ -574,8 +574,8 @@ def evolv_Rie_uadv_burgers(xx, hh, nt, cfl_cut = 0.98,
 
 
 def ops_Lax_LL_Add(xx, hh, nt, a, b, cfl_cut = 0.98, 
-        ddx = lambda x,y: deriv_dnw(x, y), 
-        bnd_type='wrap', bnd_limits=[0,1], **kwargs): 
+        ddx = lambda x,y: deriv_cent(x, y), 
+        bnd_type='wrap', bnd_limits=[1,1], **kwargs): 
     r"""
     Advance nt time-steps in time the burger eq for a being a and b 
     a fix constant or array. Solving two advective terms separately 
@@ -622,6 +622,37 @@ def ops_Lax_LL_Add(xx, hh, nt, a, b, cfl_cut = 0.98,
         all the elements of the domain. 
     """
 
+    tt = np.zeros(nt)
+    unnt = np.zeros((nt, len(xx)))
+
+    #setting initial values
+    unnt[0,:] = hh
+    tt[0] = 0
+
+    for i in range(0,nt-1):
+        #getting timestep and rhs of Burgers eq
+        dt, rhs_u = step_adv_burgers(xx, hh, a, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
+        dt, rhs_v = step_adv_burgers(xx, hh, b, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
+
+        #forwarding in time
+        uu = 0.5 * (np.roll(hh, -1) + np.roll(hh, +1)) + rhs_u * dt
+        vv = 0.5 * (np.roll(hh, -1) + np.roll(hh, +1)) + rhs_v * dt
+   
+        #remove ill calculated points
+        if bnd_limits[1] != 0:
+            uu = uu[bnd_limits[0]:-bnd_limits[1]]
+            vv = vv[bnd_limits[0]:-bnd_limits[1]]
+        else:
+            uu = uu[bnd_limits[0]:]
+            vv = vv[bnd_limits[0]:]
+        #padding
+        uu = np.pad(vv, pad_width=bnd_limits ,mode=bnd_type)
+        vv = np.pad(vv, pad_width=bnd_limits ,mode=bnd_type)
+
+
+        unnt[i+1,:] = uu + vv - unnt[i,:]
+        tt[i+1] = tt[i] + dt
+    return tt, unnt
 
 def ops_Lax_LL_Lie(xx, hh, nt, a, b, cfl_cut = 0.98, 
         ddx = lambda x,y: deriv_dnw(x, y), 
@@ -818,7 +849,10 @@ def NR_f(xx, un, uo, a, dt, **kwargs):
     -------
     `array`
         function  u^{n+1}_{j}-u^{n}_{j} - a (u^{n+1}_{j+1} - 2 u^{n+1}_{j} -u^{n+1}_{j-1}) dt
-    """    
+    """
+    dx = np.roll(xx, -1) - xx
+
+    return un - uo - (np.roll(un, -1) - 2 * un + np.roll(un, 1)) * dt /(dx**2)
 
 
 def jacobian(xx, un, a, dt, **kwargs): 
@@ -840,7 +874,9 @@ def jacobian(xx, un, a, dt, **kwargs):
     -------
     `array`
         Jacobian F_j'(u^{n+1}{k})
-    """    
+    """
+    #Derivative of F function
+
 
 
 def Newton_Raphson(xx, hh, a, dt, nt, toll= 1e-5, ncount=2, 
@@ -894,7 +930,8 @@ def Newton_Raphson(xx, hh, a, dt, nt, toll= 1e-5, ncount=2,
     t=np.zeros((nt))
     
     ## Looping over time 
-    for it in range(1,nt): 
+    for it in range(1,nt):
+        #u(x) for some given timestep 
         uo=unnt[:,it-1]
         ug=unnt[:,it-1] 
         count = 0 
@@ -1182,4 +1219,3 @@ def hyman_pred(f, fold, dfdt, a1, b1, a2, b2):
     f = tempvar
     
     return f, fold, fsav
-
