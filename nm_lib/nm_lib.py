@@ -711,26 +711,31 @@ def ops_Lax_LL_Lie(xx, hh, nt, a, b, cfl_cut = 0.98,
     for i in range(0,nt-1):
         #getting timestep and rhs of Burgers eq
         dt, rhs_u = step_adv_burgers(xx, unnt[i,:], a, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
-        
 
         #forwarding u in time
         uu = 0.5 * (np.roll(unnt[i,:], -1) + np.roll(unnt[i,:], +1)) + rhs_u * dt
+
+        #remove ill calculated points
+        if bnd_limits[1] != 0:
+            uu = uu[bnd_limits[0]:-bnd_limits[1]]
+        else:
+            uu = uu[bnd_limits[0]:]
         
+        #padding
+        uu = np.pad(uu, pad_width=bnd_limits ,mode=bnd_type)
+
         #spacial derivative of v with uu as input
         dt, rhs_v = step_adv_burgers(xx, uu, b, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
         
         #forwarding v in time
-        vv = 0.5 * (np.roll(unnt[i,:], -1) + np.roll(unnt[i,:], +1)) + rhs_v * dt
+        vv = 0.5 * (np.roll(uu, -1) + np.roll(uu, +1)) + rhs_v * dt
    
         #remove ill calculated points
         if bnd_limits[1] != 0:
-            uu = uu[bnd_limits[0]:-bnd_limits[1]]
             vv = vv[bnd_limits[0]:-bnd_limits[1]]
         else:
-            uu = uu[bnd_limits[0]:]
             vv = vv[bnd_limits[0]:]
         #padding
-        uu = np.pad(vv, pad_width=bnd_limits ,mode=bnd_type)
         vv = np.pad(vv, pad_width=bnd_limits ,mode=bnd_type)
 
         unnt[i+1,:] = vv
@@ -740,8 +745,8 @@ def ops_Lax_LL_Lie(xx, hh, nt, a, b, cfl_cut = 0.98,
 
 
 def ops_Lax_LL_Strang(xx, hh, nt, a, b, cfl_cut = 0.98, 
-        ddx = lambda x,y: deriv_dnw(x, y), 
-        bnd_type='wrap', bnd_limits=[0,1], **kwargs): 
+        ddx = lambda x,y: deriv_cent(x, y), 
+        bnd_type='wrap', bnd_limits=[1,1], **kwargs): 
     r"""
     Advance nt time-steps in time the burger eq for a being a and b 
     a fix constant or array. Solving two advective terms separately 
@@ -787,6 +792,50 @@ def ops_Lax_LL_Strang(xx, hh, nt, a, b, cfl_cut = 0.98,
         Spatial and time evolution of u^n_j for n = (0,nt), and where j represents
         all the elements of the domain. 
     """
+    tt = np.zeros(nt)
+    unnt = np.zeros((nt, len(xx)))
+
+    #setting initial values
+    unnt[0,:] = hh
+    tt[0] = 0
+
+    for i in range(0,nt-1):
+        #getting timestep and rhs of Burgers eq
+        dt, rhs_u = step_adv_burgers(xx, unnt[i,:], a, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
+        #Forwarding u a half step in time
+        uu = 0.5 * (np.roll(unnt[i,:], -1) + np.roll(unnt[i,:], +1)) + rhs_u * dt/2
+        
+        #remove ill calculated points
+        if bnd_limits[1] != 0:
+            uu = uu[bnd_limits[0]:-bnd_limits[1]]
+        else:
+            uu = uu[bnd_limits[0]:]
+        #padding
+        uu = np.pad(uu, pad_width=bnd_limits ,mode=bnd_type)
+
+        #spacial derivative of v with uu as input
+        dt, rhs_v = step_adv_burgers(xx, uu, b, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
+        
+        #full step vv in time
+        vv = 0.5 * (np.roll(uu, -1) + np.roll(uu, +1)) + rhs_v * dt
+   
+        #remove ill calculated points
+        if bnd_limits[1] != 0:
+            vv = vv[bnd_limits[0]:-bnd_limits[1]]
+        else:
+            vv = vv[bnd_limits[0]:]
+        #padding
+        vv = np.pad(vv, pad_width=bnd_limits ,mode=bnd_type)
+
+        #spacial derivative of ww with vv as input
+        dt, rhs_w = step_adv_burgers(xx, vv, a, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
+
+        #forwarding w in time, half timestep
+        ww = 0.5 * (np.roll(vv, -1) + np.roll(vv, +1)) + rhs_w * dt/2
+
+        unnt[i+1,:] = ww
+        tt[i+1] = tt[i] + dt
+    return tt, unnt
 
 
 
