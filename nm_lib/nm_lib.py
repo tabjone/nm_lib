@@ -631,12 +631,12 @@ def ops_Lax_LL_Add(xx, hh, nt, a, b, cfl_cut = 0.98,
 
     for i in range(0,nt-1):
         #getting timestep and rhs of Burgers eq
-        dt, rhs_u = step_adv_burgers(xx, hh, a, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
-        dt, rhs_v = step_adv_burgers(xx, hh, b, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
+        dt, rhs_u = step_adv_burgers(xx, unnt[i,:], a, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
+        dt, rhs_v = step_adv_burgers(xx, unnt[i,:], b, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
 
         #forwarding in time
-        uu = 0.5 * (np.roll(hh, -1) + np.roll(hh, +1)) + rhs_u * dt
-        vv = 0.5 * (np.roll(hh, -1) + np.roll(hh, +1)) + rhs_v * dt
+        uu = 0.5 * (np.roll(unnt[i,:], -1) + np.roll(unnt[i,:], +1)) + rhs_u * dt
+        vv = 0.5 * (np.roll(unnt[i,:], -1) + np.roll(unnt[i,:], +1)) + rhs_v * dt
    
         #remove ill calculated points
         if bnd_limits[1] != 0:
@@ -655,8 +655,8 @@ def ops_Lax_LL_Add(xx, hh, nt, a, b, cfl_cut = 0.98,
     return tt, unnt
 
 def ops_Lax_LL_Lie(xx, hh, nt, a, b, cfl_cut = 0.98, 
-        ddx = lambda x,y: deriv_dnw(x, y), 
-        bnd_type='wrap', bnd_limits=[0,1], **kwargs): 
+        ddx = lambda x,y: deriv_cent(x, y), 
+        bnd_type='wrap', bnd_limits=[1,1], **kwargs): 
     r"""
     Advance nt time-steps in time the burger eq for a being a and b 
     a fix constant or array. Solving two advective terms separately 
@@ -701,6 +701,42 @@ def ops_Lax_LL_Lie(xx, hh, nt, a, b, cfl_cut = 0.98,
         Spatial and time evolution of u^n_j for n = (0,nt), and where j represents
         all the elements of the domain. 
     """
+    tt = np.zeros(nt)
+    unnt = np.zeros((nt, len(xx)))
+
+    #setting initial values
+    unnt[0,:] = hh
+    tt[0] = 0
+
+    for i in range(0,nt-1):
+        #getting timestep and rhs of Burgers eq
+        dt, rhs_u = step_adv_burgers(xx, unnt[i,:], a, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
+        
+
+        #forwarding u in time
+        uu = 0.5 * (np.roll(unnt[i,:], -1) + np.roll(unnt[i,:], +1)) + rhs_u * dt
+        
+        #spacial derivative of v with uu as input
+        dt, rhs_v = step_adv_burgers(xx, uu, b, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
+        
+        #forwarding v in time
+        vv = 0.5 * (np.roll(unnt[i,:], -1) + np.roll(unnt[i,:], +1)) + rhs_v * dt
+   
+        #remove ill calculated points
+        if bnd_limits[1] != 0:
+            uu = uu[bnd_limits[0]:-bnd_limits[1]]
+            vv = vv[bnd_limits[0]:-bnd_limits[1]]
+        else:
+            uu = uu[bnd_limits[0]:]
+            vv = vv[bnd_limits[0]:]
+        #padding
+        uu = np.pad(vv, pad_width=bnd_limits ,mode=bnd_type)
+        vv = np.pad(vv, pad_width=bnd_limits ,mode=bnd_type)
+
+        unnt[i+1,:] = vv
+        tt[i+1] = tt[i] + dt
+    return tt, unnt
+
 
 
 def ops_Lax_LL_Strang(xx, hh, nt, a, b, cfl_cut = 0.98, 
