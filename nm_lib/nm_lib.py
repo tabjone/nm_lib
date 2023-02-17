@@ -412,8 +412,8 @@ def evolv_Lax_uadv_burgers(xx, hh, nt, cfl_cut = 0.98,
 
 
 def evolv_Lax_adv_burgers(xx, hh, nt, a, cfl_cut = 0.98, 
-        ddx = lambda x,y: deriv_dnw(x, y), 
-        bnd_type='wrap', bnd_limits=[0,1], **kwargs):
+        ddx = lambda x,y: deriv_cent(x, y), 
+        bnd_type='wrap', bnd_limits=[1,1], **kwargs):
     r"""
     Advance nt time-steps in time the burger eq for a being a a fix constant or array.
 
@@ -453,6 +453,29 @@ def evolv_Lax_adv_burgers(xx, hh, nt, a, cfl_cut = 0.98,
         Spatial and time evolution of u^n_j for n = (0,nt), and where j represents
         all the elements of the domain. 
     """
+    tt = np.zeros(nt)
+    unnt = np.zeros((nt, len(xx)))
+
+    #setting initial values
+    unnt[0,:] = hh
+    tt[0] = 0
+
+    for i in range(0,nt-1):
+        #getting timestep and rhs of Burgers eq
+        dt, rhs = step_adv_burgers(xx, hh,a, ddx=ddx, cfl_cut=cfl_cut, **kwargs)
+        #forwarding in time
+        hh = 0.5 * (np.roll(hh, -1) + np.roll(hh, +1)) + rhs * dt
+   
+        #remove ill calculated points
+        if bnd_limits[1] != 0:
+            hh = hh[bnd_limits[0]:-bnd_limits[1]]
+        else:
+            hh = hh[bnd_limits[0]:]
+        #padding
+        hh = np.pad(hh, pad_width=bnd_limits ,mode=bnd_type)
+        unnt[i+1,:] = hh
+        tt[i+1] = tt[i] + dt
+    return tt, unnt
 
 
 
@@ -473,6 +496,8 @@ def cfl_diff_burger(a,x):
     `float`
         min(dx/|a|)
     """
+    grad_x = np.gradient(x)
+    return np.min(grad_x*grad_x/4*np.abs(a))
 
 def tangent(xx, hh, i):
     """
@@ -631,9 +656,10 @@ def ops_Lax_LL_Add(xx, hh, nt, a, b, cfl_cut = 0.98,
 
     for i in range(0,nt-1):
         #getting timestep and rhs of Burgers eq
-        dt, rhs_u = step_adv_burgers(xx, unnt[i,:], a, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
-        dt, rhs_v = step_adv_burgers(xx, unnt[i,:], b, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
+        dt1, rhs_u = step_adv_burgers(xx, unnt[i,:], a, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
+        dt2, rhs_v = step_adv_burgers(xx, unnt[i,:], b, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
 
+        dt = np.min([dt1, dt2])
         #forwarding in time
         uu = 0.5 * (np.roll(unnt[i,:], -1) + np.roll(unnt[i,:], +1)) + rhs_u * dt
         vv = 0.5 * (np.roll(unnt[i,:], -1) + np.roll(unnt[i,:], +1)) + rhs_v * dt
@@ -800,8 +826,9 @@ def ops_Lax_LL_Strang(xx, hh, nt, a, b, cfl_cut = 0.98,
     tt[0] = 0
 
     for i in range(0,nt-1):
+        dt = cfl_adv_burger(a,xx)
         #getting timestep and rhs of Burgers eq
-        dt, rhs_u = step_adv_burgers(xx, unnt[i,:], a, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
+        _, rhs_u = step_adv_burgers(xx, unnt[i,:], a, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
         #Forwarding u a half step in time
         uu = 0.5 * (np.roll(unnt[i,:], -1) + np.roll(unnt[i,:], +1)) + rhs_u * dt/2
         
@@ -814,7 +841,7 @@ def ops_Lax_LL_Strang(xx, hh, nt, a, b, cfl_cut = 0.98,
         uu = np.pad(uu, pad_width=bnd_limits ,mode=bnd_type)
 
         #spacial derivative of v with uu as input
-        dt, rhs_v = step_adv_burgers(xx, uu, b, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
+        _, rhs_v = step_adv_burgers(xx, uu, b, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
         
         #full step vv in time
         vv = 0.5 * (np.roll(uu, -1) + np.roll(uu, +1)) + rhs_v * dt
@@ -887,6 +914,51 @@ def osp_Lax_LH_Strang(xx, hh, nt, a, b, cfl_cut = 0.98,
         Spatial and time evolution of u^n_j for n = (0,nt), and where j represents
         all the elements of the domain. 
     """
+    tt = np.zeros(nt)
+    unnt = np.zeros((nt, len(xx)))
+
+    #setting initial values
+    unnt[0,:] = hh
+    tt[0] = 0
+
+    for i in range(0,nt-1):
+        dt = cfl_adv_burger(a,xx)
+        #getting timestep and rhs of Burgers eq
+        _, rhs_u = step_adv_burgers(xx, unnt[i,:], a, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
+        #Forwarding u a half step in time
+        uu = 0.5 * (np.roll(unnt[i,:], -1) + np.roll(unnt[i,:], +1)) + rhs_u * dt/2
+        
+        #remove ill calculated points
+        if bnd_limits[1] != 0:
+            uu = uu[bnd_limits[0]:-bnd_limits[1]]
+        else:
+            uu = uu[bnd_limits[0]:]
+        #padding
+        uu = np.pad(uu, pad_width=bnd_limits ,mode=bnd_type)
+
+        #spacial derivative of v with uu as input
+        _, rhs_v = step_adv_burgers(xx, uu, b, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
+        
+        #full step vv in time
+        vv = hyman(xx, uu, dt, b, ddx=ddx, bnd_type=bnd_type, bnd_limits=bnd_limits, cfl_cut=cfl_cut, **kwargs)
+   
+        #remove ill calculated points
+        if bnd_limits[1] != 0:
+            vv = vv[bnd_limits[0]:-bnd_limits[1]]
+        else:
+            vv = vv[bnd_limits[0]:]
+        #padding
+        vv = np.pad(vv, pad_width=bnd_limits ,mode=bnd_type)
+
+        #spacial derivative of ww with vv as input
+        dt, rhs_w = step_adv_burgers(xx, vv, a, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
+
+        #forwarding w in time, half timestep
+        ww = 0.5 * (np.roll(vv, -1) + np.roll(vv, +1)) + rhs_w * dt/2
+
+        unnt[i+1,:] = ww
+        tt[i+1] = tt[i] + dt
+    return tt, unnt
 
 
 def step_diff_burgers(xx, hh, a, ddx = lambda x,y: deriv_cent(x, y), **kwargs): 
@@ -910,7 +982,10 @@ def step_diff_burgers(xx, hh, a, ddx = lambda x,y: deriv_cent(x, y), **kwargs):
     -------
     `array`
         Right hand side of (u^{n+1}-u^{n})/dt = from burgers eq, i.e., x \frac{\partial u}{\partial x} 
-    """    
+    """
+    #first up, then down
+    dt = cfl_diff_burger(a, xx)
+    return dt, - a * deriv_dnw(xx, deriv_upw(xx, hh, **kwargs), **kwargs)
 
 
 def NR_f(xx, un, uo, a, dt, **kwargs): 
@@ -936,7 +1011,7 @@ def NR_f(xx, un, uo, a, dt, **kwargs):
         function  u^{n+1}_{j}-u^{n}_{j} - a (u^{n+1}_{j+1} - 2 u^{n+1}_{j} -u^{n+1}_{j-1}) dt
     """
     dx = np.roll(xx, -1) - xx
-
+    
     return un - uo - (np.roll(un, -1) - 2 * un + np.roll(un, 1)) * dt /(dx**2)
 
 
@@ -1075,6 +1150,7 @@ def NR_f_u(xx, un, uo, dt, **kwargs):
     `array`
         function  u^{n+1}_{j}-u^{n}_{j} - a (u^{n+1}_{j+1} - 2 u^{n+1}_{j} -u^{n+1}_{j-1}) dt
     """    
+
 
 
 def jacobian_u(xx, un, dt, **kwargs): 
