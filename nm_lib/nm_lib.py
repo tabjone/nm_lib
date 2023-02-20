@@ -940,7 +940,7 @@ def osp_Lax_LH_Strang(xx, hh, nt, a, b, cfl_cut = 0.98,
         _, rhs_v = step_adv_burgers(xx, uu, b, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
         
         #full step vv in time
-        vv = hyman(xx, uu, dt, b, ddx=ddx, bnd_type=bnd_type, bnd_limits=bnd_limits, cfl_cut=cfl_cut, **kwargs)
+        vv,_,_ = hyman(xx, uu, dt, b, ddx=ddx, bnd_type=bnd_type, bnd_limits=bnd_limits, cfl_cut=cfl_cut, **kwargs)
    
         #remove ill calculated points
         if bnd_limits[1] != 0:
