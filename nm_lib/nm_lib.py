@@ -543,20 +543,23 @@ def step_Rie_uadv_burgers(xx, hh, clf_cut = 0.98,
     rhs : `array`
         Right hand side of the Burger's eq
     """
+    uL = hh
+    uR = np.roll(hh, -1)
+    fL = 1/2 * uL**2
+    fR = 1/2 * uR**2
 
-    #find tangent of uL
-    tangent_uL = tangent(xx, hh, 0)
-    #find tangent of uR
-    tangent_uR = tangent(xx, hh, -1)
+    propSpeedL = ddx(np.abs(uL), fL)
+    propSpeedR = ddx(np.abs(uR), fR)
 
-    a_uRL = (tangent_uR - tangent_uL)/(hh[-1] - hh[0])
+    propSpeed = np.max(propSpeedL, propSpeedR)
 
-    lin_approx = a_uRL * (hh - hh[-1]) + tangent_uR 
-    
+    #this is grid shifted +1/2 to the right
+    interfaceFlux = 1/2 * (fL + fR) - 1/2 * propSpeed * (uR - uL)
+
     #compute dt
-    dt = cfl_adv_burger(xx, hh)
+    dt = cfl_adv_burger(propSpeed, xx)
 
-    rhs = -hh * ddx(xx, lin_approx, **kwargs)
+    rhs = - (interfaceFlux - np.roll(interfaceFlux, 1))
 
     return dt, rhs
 
@@ -574,7 +577,6 @@ def evolv_Rie_uadv_burgers(xx, hh, nt, cfl_cut = 0.98,
     unnt[0,:] = hh
     tt[0] = 0
 
-    #dt = cfl_cut * cfl_adv_burger(hh, xx)
 
     for i in range(0,nt-1):
         #getting timestep and rhs of Burgers eq
