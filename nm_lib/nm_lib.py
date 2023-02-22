@@ -548,19 +548,21 @@ def step_Rie_uadv_burgers(xx, hh, clf_cut = 0.98,
     fL = 1/2 * uL**2
     fR = 1/2 * uR**2
 
-    propSpeedL = ddx(np.abs(uL), fL)
-    propSpeedR = ddx(np.abs(uR), fR)
+    propSpeedL = np.abs(uL)
+    propSpeedR = np.abs(uR)
 
-    propSpeed = np.max(propSpeedL, propSpeedR)
+    propSpeed = np.max([propSpeedL, propSpeedR], axis=0)
+    print(np.shape(propSpeed))
 
     #this is grid shifted +1/2 to the right
     interfaceFlux = 1/2 * (fL + fR) - 1/2 * propSpeed * (uR - uL)
 
     #compute dt
     dt = cfl_adv_burger(propSpeed, xx)
+    dx = np.roll(xx, -1) - xx
 
-    rhs = - (interfaceFlux - np.roll(interfaceFlux, 1))
-
+    rhs = - (interfaceFlux - np.roll(interfaceFlux, 1))/dx
+    print(dt)
     return dt, rhs
 
 
@@ -736,9 +738,14 @@ def ops_Lax_LL_Lie(xx, hh, nt, a, b, cfl_cut = 0.98,
     unnt[0,:] = hh
     tt[0] = 0
 
+
+
     for i in range(0,nt-1):
+        dt1 = cfl_adv_burger(a, xx)
+        dt2 = cfl_adv_burger(b, xx)
+        dt = np.min([dt1, dt2])
         #getting timestep and rhs of Burgers eq
-        dt, rhs_u = step_adv_burgers(xx, unnt[i,:], a, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
+        _, rhs_u = step_adv_burgers(xx, unnt[i,:], a, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
 
         #forwarding u in time
         uu = 0.5 * (np.roll(unnt[i,:], -1) + np.roll(unnt[i,:], +1)) + rhs_u * dt
@@ -753,7 +760,7 @@ def ops_Lax_LL_Lie(xx, hh, nt, a, b, cfl_cut = 0.98,
         uu = np.pad(uu, pad_width=bnd_limits ,mode=bnd_type)
 
         #spacial derivative of v with uu as input
-        dt, rhs_v = step_adv_burgers(xx, uu, b, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
+        _, rhs_v = step_adv_burgers(xx, uu, b, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
         
         #forwarding v in time
         vv = 0.5 * (np.roll(uu, -1) + np.roll(uu, +1)) + rhs_v * dt
@@ -827,8 +834,11 @@ def ops_Lax_LL_Strang(xx, hh, nt, a, b, cfl_cut = 0.98,
     unnt[0,:] = hh
     tt[0] = 0
 
+
     for i in range(0,nt-1):
-        dt = cfl_adv_burger(a,xx)
+        dt1 = cfl_adv_burger(a, xx)
+        dt2 = cfl_adv_burger(b, xx)
+        dt = np.min([dt1, dt2])
         #getting timestep and rhs of Burgers eq
         _, rhs_u = step_adv_burgers(xx, unnt[i,:], a, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
         #Forwarding u a half step in time
@@ -857,7 +867,7 @@ def ops_Lax_LL_Strang(xx, hh, nt, a, b, cfl_cut = 0.98,
         vv = np.pad(vv, pad_width=bnd_limits ,mode=bnd_type)
 
         #spacial derivative of ww with vv as input
-        dt, rhs_w = step_adv_burgers(xx, vv, a, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
+        _, rhs_w = step_adv_burgers(xx, vv, a, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
 
         #forwarding w in time, half timestep
         ww = 0.5 * (np.roll(vv, -1) + np.roll(vv, +1)) + rhs_w * dt/2
@@ -923,8 +933,13 @@ def osp_Lax_LH_Strang(xx, hh, nt, a, b, cfl_cut = 0.98,
     unnt[0,:] = hh
     tt[0] = 0
 
+
+
     for i in range(0,nt-1):
-        dt = cfl_adv_burger(a,xx)
+        dt1 = cfl_adv_burger(a, xx)
+        dt2 = cfl_adv_burger(b, xx)
+        dt = np.min([dt1, dt2])
+
         #getting timestep and rhs of Burgers eq
         _, rhs_u = step_adv_burgers(xx, unnt[i,:], a, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
         #Forwarding u a half step in time
@@ -941,8 +956,16 @@ def osp_Lax_LH_Strang(xx, hh, nt, a, b, cfl_cut = 0.98,
         #spacial derivative of v with uu as input
         _, rhs_v = step_adv_burgers(xx, uu, b, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
         
+        if i==1:
+            un, uo, dt_v = hyman(xx, uu,dt, b, cfl_cut=cfl_cut, ddx=ddx,
+                                       bnd_limits=b_lim)
+        else:
+                    un, uo, dt_v =  hyman(xx, uu, dt, b, cfl_cut=cfl_cut, ddx=ddx, bnd_limits=b_lim,
+                                            fold=uo, dtold=dt_v)
+
+
         #full step vv in time
-        vv,_,_ = hyman(xx, uu, dt, b, ddx=ddx, bnd_type=bnd_type, bnd_limits=bnd_limits, cfl_cut=cfl_cut, **kwargs)
+        vv,fold,dtold = hyman(xx, uu, dt, b, ddx=ddx, bnd_type=bnd_type, bnd_limits=bnd_limits, cfl_cut=cfl_cut, **kwargs)
    
         #remove ill calculated points
         if bnd_limits[1] != 0:
@@ -953,7 +976,7 @@ def osp_Lax_LH_Strang(xx, hh, nt, a, b, cfl_cut = 0.98,
         vv = np.pad(vv, pad_width=bnd_limits ,mode=bnd_type)
 
         #spacial derivative of ww with vv as input
-        dt, rhs_w = step_adv_burgers(xx, vv, a, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
+        _, rhs_w = step_adv_burgers(xx, vv, a, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
 
         #forwarding w in time, half timestep
         ww = 0.5 * (np.roll(vv, -1) + np.roll(vv, +1)) + rhs_w * dt/2
