@@ -956,16 +956,16 @@ def osp_Lax_LH_Strang(xx, hh, nt, a, b, cfl_cut = 0.98,
         #spacial derivative of v with uu as input
         _, rhs_v = step_adv_burgers(xx, uu, b, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
         
-        if i==1:
-            un, uo, dt_v = hyman(xx, uu,dt, b, cfl_cut=cfl_cut, ddx=ddx,
-                                       bnd_limits=b_lim)
+        if i==0:
+            uu, uo, dt_v = hyman(xx, uu, dt, b, cfl_cut=cfl_cut, ddx=ddx,
+                                       bnd_limits=bnd_limits)
         else:
-                    un, uo, dt_v =  hyman(xx, uu, dt, b, cfl_cut=cfl_cut, ddx=ddx, bnd_limits=b_lim,
-                                            fold=uo, dtold=dt_v)
+            uu, uo, dt_v =  hyman(xx, uu, dt, b, cfl_cut=cfl_cut, ddx=ddx, bnd_limits=bnd_limits,
+                                    fold=uo, dtold=dt_v)
 
 
         #full step vv in time
-        vv,fold,dtold = hyman(xx, uu, dt, b, ddx=ddx, bnd_type=bnd_type, bnd_limits=bnd_limits, cfl_cut=cfl_cut, **kwargs)
+        vv,uo,dt_v = hyman(xx, uu, dt, b, ddx=ddx, bnd_type=bnd_type, bnd_limits=bnd_limits, cfl_cut=cfl_cut, **kwargs)
    
         #remove ill calculated points
         if bnd_limits[1] != 0:
