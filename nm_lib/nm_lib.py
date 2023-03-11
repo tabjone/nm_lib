@@ -497,7 +497,7 @@ def cfl_diff_burger(a,x):
         min(dx/|a|)
     """
     grad_x = np.gradient(x)
-    return np.min(grad_x*grad_x/4*np.abs(a))
+    return np.min(grad_x*grad_x/(4*np.abs(a)))
 
 def tangent(xx, hh, i):
     """
@@ -552,7 +552,6 @@ def step_Rie_uadv_burgers(xx, hh, clf_cut = 0.98,
     propSpeedR = np.abs(uR)
 
     propSpeed = np.max([propSpeedL, propSpeedR], axis=0)
-    print(np.shape(propSpeed))
 
     #this is grid shifted +1/2 to the right
     interfaceFlux = 1/2 * (fL + fR) - 1/2 * propSpeed * (uR - uL)
@@ -562,7 +561,6 @@ def step_Rie_uadv_burgers(xx, hh, clf_cut = 0.98,
     dx = np.roll(xx, -1) - xx
 
     rhs = - (interfaceFlux - np.roll(interfaceFlux, 1))/dx
-    print(dt)
     return dt, rhs
 
 
@@ -956,17 +954,14 @@ def osp_Lax_LH_Strang(xx, hh, nt, a, b, cfl_cut = 0.98,
         #spacial derivative of v with uu as input
         _, rhs_v = step_adv_burgers(xx, uu, b, cfl_cut = cfl_cut, ddx = ddx, **kwargs)
         
+        #full step vv in time
         if i==0:
-            uu, uo, dt_v = hyman(xx, uu, dt, b, cfl_cut=cfl_cut, ddx=ddx,
+            vv, uo, dt_v = hyman(xx, uu, dt, b, cfl_cut=cfl_cut, ddx=ddx,
                                        bnd_limits=bnd_limits)
         else:
-            uu, uo, dt_v =  hyman(xx, uu, dt, b, cfl_cut=cfl_cut, ddx=ddx, bnd_limits=bnd_limits,
+            vv, uo, dt_v =  hyman(xx, uu, dt, b, cfl_cut=cfl_cut, ddx=ddx, bnd_limits=bnd_limits,
                                     fold=uo, dtold=dt_v)
 
-
-        #full step vv in time
-        vv,uo,dt_v = hyman(xx, uu, dt, b, ddx=ddx, bnd_type=bnd_type, bnd_limits=bnd_limits, cfl_cut=cfl_cut, **kwargs)
-   
         #remove ill calculated points
         if bnd_limits[1] != 0:
             vv = vv[bnd_limits[0]:-bnd_limits[1]]
