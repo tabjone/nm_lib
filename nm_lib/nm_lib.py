@@ -674,7 +674,7 @@ def ops_Lax_LL_Add(xx, hh, nt, a, b, cfl_cut = 0.98,
             uu = uu[bnd_limits[0]:]
             vv = vv[bnd_limits[0]:]
         #padding
-        uu = np.pad(vv, pad_width=bnd_limits ,mode=bnd_type)
+        uu = np.pad(uu, pad_width=bnd_limits ,mode=bnd_type)
         vv = np.pad(vv, pad_width=bnd_limits ,mode=bnd_type)
 
 
