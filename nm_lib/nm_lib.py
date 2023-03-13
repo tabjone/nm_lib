@@ -1188,7 +1188,10 @@ def NR_f_u(xx, un, uo, dt, **kwargs):
     -------
     `array`
         function  u^{n+1}_{j}-u^{n}_{j} - a (u^{n+1}_{j+1} - 2 u^{n+1}_{j} -u^{n+1}_{j-1}) dt
-    """    
+    """
+    dx = xx[1] - xx[0]
+    #F function
+    return un - uo - uo * (np.roll(un, -1) - 2 * un + np.roll(un, +1)) * dt
 
 
 
@@ -1212,6 +1215,16 @@ def jacobian_u(xx, un, dt, **kwargs):
     `array`
         Jacobian F_j'(u^{n+1}{k})
     """    
+    #Derivative of F function
+    dx = xx[1] - xx[0]
+    jac = np.zeros((np.size(xx), np.size(xx)))
+    for ix in range(np.size(xx)):
+        jac[ix, ix] = 1 + dt * 2 * un[ix]/(dx**2)
+        if ix < np.size(xx) - 1:
+            jac[ix, ix+1] = - dt * un[ix]/(dx**2)
+        if ix > 1:
+            jac[ix, ix-1] = - dt * un[ix]/(dx**2)
+    return jac
 
 
 def Newton_Raphson_u(xx, hh, dt, nt, toll= 1e-5, ncount=2, 
