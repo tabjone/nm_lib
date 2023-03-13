@@ -314,6 +314,7 @@ def evolv_uadv_burgers(xx, hh, nt, cfl_cut = 0.98,
 
     return tt, unnt
     
+
 def step_uadv_burgers(xx, hh, cfl_cut = 0.98, 
                     ddx = lambda x,y: deriv_dnw(x, y), **kwargs): 
     r"""
@@ -476,49 +477,6 @@ def evolv_Lax_adv_burgers(xx, hh, nt, a, cfl_cut = 0.98,
         unnt[i+1,:] = hh
         tt[i+1] = tt[i] + dt
     return tt, unnt
-
-
-
-def cfl_diff_burger(a,x): 
-    r"""
-    Computes the dt_fact, i.e., Courant, Fredrich, and 
-    Lewy condition for the diffusive term in the Burger's eq. 
-
-    Parameters
-    ----------
-    a : `float` or `array` 
-        Either constant, or array which multiply the right hand side of the Burger's eq.
-    x : `array`
-        Spatial axis. 
-
-    Returns
-    -------
-    `float`
-        min(dx/|a|)
-    """
-    grad_x = np.gradient(x)
-    return np.min(grad_x*grad_x/(4*np.abs(a)))
-
-def tangent(xx, hh, i):
-    """
-    Computes the tangent of the function hh at the point xx[i]
-
-    Parameters
-    ----------
-    xx : `array`
-        Spatial axis.
-    hh : `array`
-        Function that depends on xx.
-    i : `int`
-        Index of the point where the tangent is computed.
-
-    Returns
-    -------
-    `array`
-        Tangent of the function hh at the point xx[i]
-    """
-    return hh[i] + np.gradient(hh)[i]/np.gradient(xx)[i] * (xx - xx[i])
-
 
 def step_Rie_uadv_burgers(xx, hh, clf_cut = 0.98,
                     ddx = lambda x,y: deriv_dnw(x, y), **kwargs):
@@ -981,7 +939,39 @@ def osp_Lax_LH_Strang(xx, hh, nt, a, b, cfl_cut = 0.98,
     return tt, unnt
 
 
-def step_diff_burgers(xx, hh, a, ddx = lambda x,y: deriv_cent(x, y), **kwargs): 
+def evolv_diff_burgers(xx, hh,nt, a, cfl_cut = 0.98, 
+        ddx = lambda x,y: deriv_cent(x, y), 
+        bnd_type='wrap', bnd_limits=[1,1], **kwargs):
+    r"""
+    Bla bla bla 
+    """
+
+    tt = np.zeros(nt)
+    unnt = np.zeros((nt, len(xx)))
+
+    #setting initial values
+    unnt[0,:] = hh
+    tt[0] = 0
+
+    for i in range(0,nt-1):
+        #getting timestep and rhs of Burgers eq
+        dt, rhs = step_diff_burgers(xx, unnt[i,:], a, ddx=ddx, cfl_cut=cfl_cut, **kwargs)
+        #forwarding in time
+        hh = unnt[i,:] + rhs * dt
+   
+        #remove ill calculated points
+        if bnd_limits[1] != 0:
+            hh = hh[bnd_limits[0]:-bnd_limits[1]]
+        else:
+            hh = hh[bnd_limits[0]:]
+        #padding
+        hh = np.pad(hh, pad_width=bnd_limits ,mode=bnd_type)
+        unnt[i+1,:] = hh
+        tt[i+1] = tt[i] + dt
+
+    return tt, unnt
+
+def step_diff_burgers(xx, hh, a, ddx = lambda x,y: deriv_cent(x, y), cfl_cut=0.98, **kwargs): 
     r"""
     Right hand side of the diffusive term of Burger's eq. where nu can be a constant or a function that 
     depends on xx. 
@@ -1004,8 +994,28 @@ def step_diff_burgers(xx, hh, a, ddx = lambda x,y: deriv_cent(x, y), **kwargs):
         Right hand side of (u^{n+1}-u^{n})/dt = from burgers eq, i.e., x \frac{\partial u}{\partial x} 
     """
     #first up, then down
-    dt = cfl_diff_burger(a, xx)
+    dt = cfl_cut * cfl_diff_burger(a, xx)
     return dt, - a * deriv_dnw(xx, deriv_upw(xx, hh, **kwargs), **kwargs)
+
+def cfl_diff_burger(a,x): 
+    r"""
+    Computes the dt_fact, i.e., Courant, Fredrich, and 
+    Lewy condition for the diffusive term in the Burger's eq. 
+
+    Parameters
+    ----------
+    a : `float` or `array` 
+        Either constant, or array which multiply the right hand side of the Burger's eq.
+    x : `array`
+        Spatial axis. 
+
+    Returns
+    -------
+    `float`
+        min(dx/|a|)
+    """
+    grad_x = np.gradient(x)
+    return np.min(grad_x*grad_x/(4*np.abs(a)))
 
 
 def NR_f(xx, un, uo, a, dt, **kwargs): 
@@ -1030,9 +1040,9 @@ def NR_f(xx, un, uo, a, dt, **kwargs):
     `array`
         function  u^{n+1}_{j}-u^{n}_{j} - a (u^{n+1}_{j+1} - 2 u^{n+1}_{j} -u^{n+1}_{j-1}) dt
     """
-    dx = np.roll(xx, -1) - xx
-    
-    return un - uo - (np.roll(un, -1) - 2 * un + np.roll(un, 1)) * dt /(dx**2)
+    dx = xx[1] - xx[0]
+    #F function
+    return un - uo - a * (np.roll(un, -1) - 2 * un + np.roll(un, +1)) * dt
 
 
 def jacobian(xx, un, a, dt, **kwargs): 
@@ -1056,6 +1066,15 @@ def jacobian(xx, un, a, dt, **kwargs):
         Jacobian F_j'(u^{n+1}{k})
     """
     #Derivative of F function
+    dx = xx[1] - xx[0]
+    jac = np.zeros((np.size(xx), np.size(xx)))
+    for ix in range(np.size(xx)):
+        jac[ix, ix] = 1 + dt * 2 * a/(dx**2)
+        if ix < np.size(xx) - 1:
+            jac[ix, ix+1] = - dt * a/(dx**2)
+        if ix > 1:
+            jac[ix, ix-1] = - dt * a/(dx**2)
+    return jac
 
 
 
