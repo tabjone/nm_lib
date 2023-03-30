@@ -995,7 +995,7 @@ def step_diff_burgers(xx, hh, a, ddx = lambda x,y: deriv_cent(x, y), cfl_cut=0.9
     """
     #first up, then down
     dt = cfl_cut * cfl_diff_burger(a, xx)
-    return dt, - a * deriv_dnw(xx, deriv_upw(xx, hh, **kwargs), **kwargs)
+    return dt,  a * deriv_dnw(xx, deriv_upw(xx, hh, **kwargs), **kwargs)
 
 def cfl_diff_burger(a,x): 
     r"""
