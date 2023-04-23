@@ -1042,7 +1042,7 @@ def NR_f(xx, un, uo, a, dt, **kwargs):
     """
     dx = xx[1] - xx[0]
     #F function
-    return un - uo - a * (np.roll(un, -1) - 2 * un + np.roll(un, +1)) * dt
+    return un - uo - a * (np.roll(un, -1) - 2 * un + np.roll(un, +1)) * dt / dx**2
 
 
 def jacobian(xx, un, a, dt, **kwargs): 
@@ -1191,7 +1191,7 @@ def NR_f_u(xx, un, uo, dt, **kwargs):
     """
     dx = xx[1] - xx[0]
     #F function
-    return un - uo - uo * (np.roll(un, -1) - 2 * un + np.roll(un, +1)) * dt
+    return un - uo - uo * (np.roll(un, -1) - 2 * un + np.roll(un, +1)) * dt/dx**2
 
 
 
